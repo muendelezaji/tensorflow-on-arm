@@ -11,19 +11,24 @@ RUN dpkg --add-architecture armhf && dpkg --add-architecture arm64 \
         libpython-dev:arm64 libpython-all-dev:arm64 libpython3-dev:arm64 libpython3-all-dev:arm64
 
 RUN echo "deb http://httpredir.debian.org/debian/ jessie main contrib non-free" > /etc/apt/sources.list.d/jessie.list \
-    && apt-get update && apt-get install -y libpng12-dev \
+    && apt-get update && apt-get install -y libpng12-dev bash-completion \
     && rm -f /etc/apt/sources.list.d/jessie.list \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install -U --user keras_applications==1.0.5 --no-deps \
-    && pip install -U --user keras_preprocessing==1.0.3 --no-deps \
-    && pip3 install -U --user keras_applications==1.0.5 --no-deps \
-    && pip3 install -U --user keras_preprocessing==1.0.3 --no-deps \
+RUN wget -q --no-check-certificate https://github.com/bazelbuild/bazel/releases/download/0.15.0/bazel_0.15.0-linux-x86_64.deb -P /tmp/ \
+    && dpkg -i /tmp/bazel_0.15.0-linux-x86_64.deb \
+    && rm -f /tmp/bazel_0.15.0-linux-x86_64.deb
+
+RUN pip install -U --user keras_applications==1.0.6 --no-deps \
+    && pip install -U --user keras_preprocessing==1.0.5 --no-deps \
+    && pip3 install -U --user keras_applications==1.0.6 --no-deps \
+    && pip3 install -U --user keras_preprocessing==1.0.5 --no-deps \
     && ldconfig
 
 WORKDIR /root
-RUN git clone https://github.com/lhelontra/tensorflow-on-arm/
+RUN git clone https://github.com/muendelezaji/tensorflow-on-arm/
 
 WORKDIR /root/tensorflow-on-arm/build_tensorflow/
-RUN git checkout v1.11.0
+RUN git checkout v1.12.0
+
 CMD ["/bin/bash"]

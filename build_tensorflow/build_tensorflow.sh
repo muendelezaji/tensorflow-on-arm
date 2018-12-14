@@ -144,6 +144,9 @@ function download_tensorflow()
   if [ ! -d tensorflow ]; then
     git clone --recurse-submodules ${TF_GIT_URL} || return 1
     cd tensorflow/
+  elif [ ! -z "$TF_REBUILD" ]; then
+    # will attempt to reuse previously downloaded repo (useful for rebuilds)
+    return 0
   else
     cd tensorflow/
     $BAZEL_BIN clean &>/dev/null
@@ -198,7 +201,10 @@ function configure_tensorflow()
 {
   # configure tensorflow
   cd ${WORKDIR}/tensorflow
-  $BAZEL_BIN clean
+  if [ -z "$TF_REBUILD" ]; then
+    $BAZEL_BIN clean
+  fi
+
   export PYTHON_BIN_PATH=$(command -v python${TF_PYTHON_VERSION})
   export ${TF_BUILD_VARS}
 
