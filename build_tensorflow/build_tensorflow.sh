@@ -242,6 +242,12 @@ function build_tensorflow()
 
   $BAZEL_BIN build ${BAZEL_LOCAL_RESOURCES} -c opt ${BAZEL_COPT_FLAGS} --verbose_failures ${BAZEL_EXTRA_FLAGS} || return 1
 
+  # Location of built wheels, libs and binaries
+  mkdir -p ${TF_BUILD_OUTPUT} || {
+    log_failure_msg "error when creates output dir $TF_BUILD_OUTPUT"
+    exit 1
+  }
+
   # Build a wheel, if needs
   [[ "${BAZEL_EXTRA_FLAGS}" == *"build_pip_package"* ]] && {
     unset BDIST_OPTS
@@ -262,22 +268,17 @@ function build_tensorflow()
   }
 
   # Copy library files, if needs
-  [[ "${BAZEL_EXTRA_FLAGS}" == *"libtensorflow.so"* ]] && {
-    # Clean and/or create output dir
-    if [ -d $TF_BUILD_OUTPUT ]; then
-      rm -rf ${TF_BUILD_OUTPUT} || {
-        log_failure_msg "error when removes output dir $TF_BUILD_OUTPUT"
-        exit 1
-      }
-    fi
-    mkdir -p ${TF_BUILD_OUTPUT} || {
-      log_failure_msg "error when creates output dir $TF_BUILD_OUTPUT"
-      exit 1
-    }
-
+  [[ "${BAZEL_EXTRA_FLAGS}" == *"libtensorflow"* ]] && {
     # collect the library files.
-    cp bazel-bin/tensorflow/libtensorflow.so $TF_BUILD_OUTPUT
-    cp tensorflow/c/c_api.h $TF_BUILD_OUTPUT
+    # C++
+    [[ "${BAZEL_EXTRA_FLAGS}" == *"libtensorflow_cc.so"* ]] && {
+      cp -v bazel-bin/tensorflow/libtensorflow_cc.so $TF_BUILD_OUTPUT
+    }
+    # C
+    [[ "${BAZEL_EXTRA_FLAGS}" == *"libtensorflow.so"* ]] && {
+      cp -v bazel-bin/tensorflow/libtensorflow.so $TF_BUILD_OUTPUT
+      cp -v tensorflow/c/c_api.h $TF_BUILD_OUTPUT
+    }
 
     log_app_msg "Library files moved to $TF_BUILD_OUTPUT"
   }
