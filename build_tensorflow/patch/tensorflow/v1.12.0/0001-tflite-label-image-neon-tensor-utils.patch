@@ -1,0 +1,51 @@
+From 0813aed7377e07d333de5e0200702452f5df3517 Mon Sep 17 00:00:00 2001
+From: temp <temp@example.com>
+Date: Tue, 22 Jan 2019 10:54:54 +0000
+Subject: [PATCH] temp modifications
+
+---
+ tensorflow/contrib/lite/kernels/internal/BUILD | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/tensorflow/contrib/lite/kernels/internal/BUILD b/tensorflow/contrib/lite/kernels/internal/BUILD
+index afb5ec0..7cc5e9d 100644
+--- a/tensorflow/contrib/lite/kernels/internal/BUILD
++++ b/tensorflow/contrib/lite/kernels/internal/BUILD
+@@ -23,6 +23,10 @@ NEON_FLAGS_IF_APPLICABLE = select({
+         "-O3",
+         "-mfpu=neon",
+     ],
++    ":armeabi": [
++        "-O3",
++        "-ftree-vectorize",
++    ],
+     ":armeabi-v7a": [
+         "-O3",
+         "-mfpu=neon",
+@@ -71,6 +75,13 @@ config_setting(
+ )
+ 
+ config_setting(
++    name = "armeabi",
++    values = {
++        "cpu": "armeabi",
++    },
++)
++
++config_setting(
+     name = "armeabi-v7a",
+     values = {
+         "cpu": "armeabi-v7a",
+@@ -481,6 +492,9 @@ cc_library(
+         ":arm64-v8a": [
+             ":neon_tensor_utils",
+         ],
++        ":armeabi": [
++            ":neon_tensor_utils",
++        ],
+         ":armeabi-v7a": [
+             ":neon_tensor_utils",
+         ],
+-- 
+2.7.4
+

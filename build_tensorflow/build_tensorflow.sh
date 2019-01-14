@@ -27,7 +27,7 @@
 [ -f "$1" ] && {
   source "$1"
 } || {
-  echo "Use: $0 <config>"
+  echo -ne "Use: $0 <config>\n\tFor prepare environment only, uses: $0 <config> prepare\n"
   exit 1
 }
 
@@ -55,7 +55,7 @@ function log_app_msg() {
 	echo -ne "[${BLUE}INFO${NC}] $@\n"
 }
 
-function create_tempdir()
+function create_workdir()
 {
   WORKDIR=${WORKDIR}/sources/
   if [ ! -d $WORKDIR ]; then
@@ -80,7 +80,9 @@ function build_bazel()
 
   if [ -f "$BAZEL_BIN" ]; then
     log_app_msg "bazel already installed."
-    ln -sf $BAZEL_BIN ${WORKDIR}/bin/bazel
+    # make sure using correct bazel version
+    rm -f ${WORKDIR}/bin/bazel &>/dev/null
+    ln -sf "${WORKDIR}/bin/bazel-${BAZEL_VERSION}" "${WORKDIR}/bin/bazel" &>/dev/null
     return 0
   fi
 
@@ -112,7 +114,8 @@ function build_bazel()
   fi
 
   chmod +x output/bazel
-  mv output/bazel $BAZEL_BIN
+  mv output/bazel "${WORKDIR}/bin/bazel-${BAZEL_VERSION}"
+  ln -sf "${WORKDIR}/bin/bazel-${BAZEL_VERSION}" "${WORKDIR}/bin/bazel" &>/dev/null
 
   return 0
 }
@@ -156,18 +159,12 @@ function download_tensorflow()
     git clean -f -d
     git checkout master
     git branch -D __temp__
+    git pull
   fi
 
-  [ "${TF_VERSION}" != "master" ] && {
-    # tries update tensorflow repository when not found selected version/commit hash
-    git checkout ${TF_VERSION} || {
-      git pull
-      # tries checkout again
-      git checkout ${TF_VERSION} || {
-        log_failure_msg "error when using tensorflow version ${TF_VERSION}"
-        exit 1
-      }
-    }
+  git checkout ${TF_VERSION} || {
+    log_failure_msg "error when using tensorflow version ${TF_VERSION}"
+    exit 1
   }
 
   # creates a temp branch for apply some patches and reuse cloned folder
@@ -205,7 +202,6 @@ function configure_tensorflow()
     # only clean if not an incremental rebuild
     $BAZEL_BIN clean
   fi
-
   export PYTHON_BIN_PATH=$(command -v python${TF_PYTHON_VERSION})
   export ${TF_BUILD_VARS}
 
@@ -241,6 +237,8 @@ function build_tensorflow()
     BAZEL_LOCAL_RESOURCES="--local_resources ${BAZEL_AVALIABLE_RAM},${BAZEL_AVALIABLE_CPU},${BAZEL_AVALIABLE_IO}"
   fi
 
+  [[ "${BAZEL_EXTRA_FLAGS}" == *"build_pip_package"* ]] && BAZEL_EXTRA_FLAGS+=" --python_path=python${TF_PYTHON_VERSION}"
+
   $BAZEL_BIN build ${BAZEL_LOCAL_RESOURCES} -c opt ${BAZEL_COPT_FLAGS} --verbose_failures ${BAZEL_EXTRA_FLAGS} || return 1
 
   # Location of built wheels, libs and binaries
@@ -264,37 +262,62 @@ function build_tensorflow()
       local f="${TF_BUILD_OUTPUT}/$(ls -t $TF_BUILD_OUTPUT | grep -i '.whl' | head -n1)"
       local new_f="$(echo $f | sed -rn "s/tensorflow-([^-]+)-([^-]+)-.*/tensorflow-\1-\2-none-${CROSSTOOL_WHEEL_ARCH}.whl/p")"
       mv $f $new_f
-      log_app_msg "wheel was renamed from $f to $new_f"
+      log_app_msg "wheel was renamed of $f for $new_f"
     fi
   }
 
   # Copy library files, if needs
   [[ "${BAZEL_EXTRA_FLAGS}" == *"libtensorflow"* ]] && {
     # collect the library files.
-    # C++
-    [[ "${BAZEL_EXTRA_FLAGS}" == *"libtensorflow_cc.so"* ]] && {
-      cp -v bazel-bin/tensorflow/libtensorflow_cc.so $TF_BUILD_OUTPUT
-    }
-    # C
-    [[ "${BAZEL_EXTRA_FLAGS}" == *"libtensorflow.so"* ]] && {
-      cp -v bazel-bin/tensorflow/libtensorflow.so $TF_BUILD_OUTPUT
-      cp -v tensorflow/c/c_api.h $TF_BUILD_OUTPUT
+    cp bazel-bin/tensorflow/libtensorflow* $TF_BUILD_OUTPUT
+    cp tensorflow/c/c_api.h $TF_BUILD_OUTPUT
+    log_app_msg "Library files moved to $TF_BUILD_OUTPUT"
+  }
+
+  # label_image binary and Python port
+  [[ "${BAZEL_EXTRA_FLAGS}" == *"label_image"* ]] && {
+    # For TensorFlow
+    [[ "${BAZEL_EXTRA_FLAGS}" == *"tensorflow/examples"* ]] && {
+      cp -v bazel-bin/tensorflow/examples/label_image/label_image $TF_BUILD_OUTPUT
+      cp -v bazel-bin/tensorflow/examples/label_image/label_image_py $TF_BUILD_OUTPUT
     }
 
-    log_app_msg "Library files moved to $TF_BUILD_OUTPUT"
+    # TF Lite version
+    [[ "${BAZEL_EXTRA_FLAGS}" == *"lite/examples"* ]] && {
+      cp -v bazel-bin/tensorflow/contrib/lite/examples/label_image/label_image $TF_BUILD_OUTPUT/tflite_label_image
+      cp -v bazel-bin/tensorflow/contrib/lite/examples/python/label_image $TF_BUILD_OUTPUT/tflite_label_image_py
+    }
+    log_app_msg "label_image files moved to $TF_BUILD_OUTPUT"
+  }
+
+  # Model benchmark tool
+  [[ "${BAZEL_EXTRA_FLAGS}" == *"benchmark_model"* ]] && {
+    cp -v bazel-bin/tensorflow/tools/benchmark/benchmark_model $TF_BUILD_OUTPUT
+    log_app_msg "model benchmark tool moved to $TF_BUILD_OUTPUT"
   }
 
   log_app_msg "Done."
 }
 
+
+function prepare_env()
+{
+  # prepare environment for compiling
+  create_workdir
+  build_bazel
+  toolchain
+  download_tensorflow
+  echo -ne "Workdir:            \t${WORKDIR}\n"
+  echo -ne "Bazel binary:       \t${BAZEL_BIN}\n"
+  [ ! -z "$CROSSTOOL_DIR" ] && echo -ne "Toolchain directory:\t${CROSSTOOL_DIR}\n"
+}
+
+
 function main()
 {
-    create_tempdir
-    build_bazel
-    toolchain
-    download_tensorflow
+    prepare_env
     configure_tensorflow
     build_tensorflow
 }
 
-main
+[ "$2" == "prepare" ] && prepare_env || main
