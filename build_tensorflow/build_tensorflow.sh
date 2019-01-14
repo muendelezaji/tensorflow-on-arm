@@ -145,7 +145,7 @@ function download_tensorflow()
     git clone --recurse-submodules ${TF_GIT_URL} || return 1
     cd tensorflow/
   elif [ ! -z "$TF_REBUILD" ]; then
-    # will attempt to reuse previously downloaded repo (useful for rebuilds)
+    # will attempt to reuse previously downloaded repo (useful for incremental rebuilds)
     return 0
   else
     cd tensorflow/
@@ -202,6 +202,7 @@ function configure_tensorflow()
   # configure tensorflow
   cd ${WORKDIR}/tensorflow
   if [ -z "$TF_REBUILD" ]; then
+    # only clean if not an incremental rebuild
     $BAZEL_BIN clean
   fi
 
@@ -263,7 +264,7 @@ function build_tensorflow()
       local f="${TF_BUILD_OUTPUT}/$(ls -t $TF_BUILD_OUTPUT | grep -i '.whl' | head -n1)"
       local new_f="$(echo $f | sed -rn "s/tensorflow-([^-]+)-([^-]+)-.*/tensorflow-\1-\2-none-${CROSSTOOL_WHEEL_ARCH}.whl/p")"
       mv $f $new_f
-      log_app_msg "wheel was renamed of $f for $new_f"
+      log_app_msg "wheel was renamed from $f to $new_f"
     fi
   }
 

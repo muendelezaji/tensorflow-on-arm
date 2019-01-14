@@ -15,20 +15,20 @@ RUN echo "deb http://httpredir.debian.org/debian/ jessie main contrib non-free" 
     && rm -f /etc/apt/sources.list.d/jessie.list \
     && rm -rf /var/lib/apt/lists/*
 
-RUN wget -q --no-check-certificate https://github.com/bazelbuild/bazel/releases/download/0.15.0/bazel_0.15.0-linux-x86_64.deb -P /tmp/ \
-    && dpkg -i /tmp/bazel_0.15.0-linux-x86_64.deb \
-    && rm -f /tmp/bazel_0.15.0-linux-x86_64.deb
-
 RUN pip install -U --user keras_applications==1.0.6 --no-deps \
     && pip install -U --user keras_preprocessing==1.0.5 --no-deps \
     && pip3 install -U --user keras_applications==1.0.6 --no-deps \
     && pip3 install -U --user keras_preprocessing==1.0.5 --no-deps \
     && ldconfig
 
+ARG BAZEL_VERSION=0.18.0
+RUN wget -q --no-check-certificate https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel_${BAZEL_VERSION}-linux-x86_64.deb -P /tmp/ \
+    && dpkg -i /tmp/bazel_${BAZEL_VERSION}-linux-x86_64.deb \
+    && rm -f /tmp/bazel_${BAZEL_VERSION}-linux-x86_64.deb
+
 WORKDIR /root
 RUN git clone https://github.com/muendelezaji/tensorflow-on-arm/
 
 WORKDIR /root/tensorflow-on-arm/build_tensorflow/
 RUN git checkout v1.12.0
-
 CMD ["/bin/bash"]
